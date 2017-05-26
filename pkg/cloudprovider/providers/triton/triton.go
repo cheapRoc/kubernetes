@@ -35,30 +35,27 @@ const (
 	KeyPath      = "/etc/triton/api_key"
 )
 
-type Client struct {
-	*triton.Client
+type Triton struct {
+	provider *triton.Client
 }
 
 type Config struct {
-	Client struct {
-		keyID       string `gcfg:"key-id"`
-		endpoint    string `gcfg:"endpoint"`
-		accountName string `gcfg:"account"`
+	Global struct {
+		KeyID       string `gcfg:"key-id"`
+		EndpointURL string `gcfg:"endpoint-url"`
+		AccountName string `gcfg:"account"`
 	}
 }
 
-type Provider struct {
-	client Client
-}
-
 func init() {
-	cloudprovider.RegisterCloudProvider(ProviderName, func(config io.Reader) (cloudprovider.Interface, error) {
-		cfg, err := readConfig(config)
-		if err != nil {
-			return nil, err
-		}
-		return newTriton(cfg)
-	})
+	cloudprovider.RegisterCloudProvider(ProviderName,
+		func(config io.Reader) (cloudprovider.Interface, error) {
+			cfg, err := readConfig(config)
+			if err != nil {
+				return nil, err
+			}
+			return newTriton(cfg)
+		})
 }
 
 func readConfig(config io.Reader) (Config, error) {
@@ -74,22 +71,25 @@ func readConfig(config io.Reader) (Config, error) {
 
 // TODO: Probably can load key out of `mdata-get`, but for now its a
 // requirement.
-func newTriton(cfg Config) (Client, error) {
+func newTriton(cfg Config) (Triton, error) {
 	privateKey, err := ioutil.ReadFile(KeyPath)
 	if err != nil {
 		glog.V(2).Error("newTriton() could not access KeyPath")
-		return err
+		return nil, err
 	}
 
-	sshKeySigner, err := authentication.NewPrivateKeySigner(cfg.keyID, cfg.privateKey, cfg.accountName)
+	sshKeySigner, err := authentication.NewPrivateKeySigner(cfg.Global.KeyID, privateKey,
+		cfg.Global.AccountName)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	client, err := triton.NewClient(cfg.endpoint, cfg.accountName, sshKeySigner)
+	client, err := triton.NewClient(cfg.Global.Endpoint, cfg.Global.AccountName, sshKeySigner)
 	if err != nil {
 		log.Fatalf("NewClient: %s", err)
 	}
 
-	return &Client{client}
+	return &Triton{
+		provider: client,
+	}, nil
 }
