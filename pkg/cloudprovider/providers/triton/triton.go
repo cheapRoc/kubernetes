@@ -47,6 +47,7 @@ type Config struct {
 	}
 }
 
+// init registers and loads Triton as a cloud provider
 func init() {
 	cloudprovider.RegisterCloudProvider(ProviderName,
 		func(config io.Reader) (cloudprovider.Interface, error) {
@@ -58,6 +59,7 @@ func init() {
 		})
 }
 
+// readConfig reads our provider's configuration file
 func readConfig(config io.Reader) (Config, error) {
 	if config == nil {
 		err := fmt.Errorf("no Triton cloud provider config file given")
@@ -71,6 +73,8 @@ func readConfig(config io.Reader) (Config, error) {
 
 // TODO: Probably can load key out of `mdata-get`, but for now its a
 // requirement.
+
+// newTriton constructs a new Triton object with our client as it's provider
 func newTriton(cfg Config) (Triton, error) {
 	privateKey, err := ioutil.ReadFile(KeyPath)
 	if err != nil {
@@ -90,6 +94,17 @@ func newTriton(cfg Config) (Triton, error) {
 	}
 
 	return &Triton{
-		provider: client,
+		Provider: client,
 	}, nil
+}
+
+// ProviderName returns our ProviderName, which is hopefully always "triton"
+func (t *Triton) ProviderName() string {
+	return ProviderName
+}
+
+// ScrubDNS filters DNS settings for pods, giving us a chance to do interesting
+// things with the configuration.
+func (t *Triton) ScrubDNS(nameservers, searches []string) (nsOut, srchOut []string) {
+	return nameservers, searches
 }
