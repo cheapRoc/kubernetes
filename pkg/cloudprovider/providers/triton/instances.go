@@ -16,6 +16,10 @@ type Instances struct {
 }
 
 // machineByName pulls the triton.Machine for a given types.NodeName
+//
+// TODO: Add functionality to refresh Instances.machines if a name isn't found
+// within them. We could also pull out the storage of machines entirely... since
+// they're bound to not be accurate or what we want over the long term.
 func (i *Instances) byNodeName(name types.NodeName) (triton.Machine, error) {
 	for _, inst := range i.machines {
 		if inst.ID == name {
@@ -40,7 +44,7 @@ func (t *Triton) Instances() (cloudprovider.Instances, bool) {
 
 	return &Instances{
 		machines: machines,
-		provider: triton.provider,
+		provider: triton.Provider,
 	}, true
 }
 
@@ -146,7 +150,7 @@ func (i *Instances) List(filter string) ([]types.NodeName, error) {
 	glog.V(2).Infof("Instances.List() called with %s", filter)
 
 	input := &triton.ListMachinesInput{}
-	machines, err := i.provider.Machines().ListMachines(context.Background(), input)
+	machines, err := i.Provider.Machines().ListMachines(context.Background(), input)
 	if err != nil {
 		glog.V(2).Errorf("Triton.Instances() returned an error: %s", err)
 		return nil, false
