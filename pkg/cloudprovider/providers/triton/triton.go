@@ -17,10 +17,14 @@ limitations under the License.
 package triton
 
 import (
+	"bytes"
+	"context"
 	"fmt"
 	"io"
 	"io/ioutil"
 	"log"
+	"os/exec"
+	"time"
 
 	"github.com/golang/glog"
 	gcfg "gopkg.in/gcfg.v1"
@@ -36,7 +40,16 @@ const (
 )
 
 type Triton struct {
-	provider *triton.Client
+	Client   *triton.Client
+	Metadata *Metadata
+	Instance triton.Machine
+}
+
+type Metadata struct {
+	UUID     string
+	Hostname string
+	// ServerUUID string
+	// Datacenter string
 }
 
 type Config struct {
@@ -71,8 +84,39 @@ func readConfig(config io.Reader) (Config, error) {
 	return cfg, err
 }
 
-// TODO: Probably can load key out of `mdata-get`, but for now its a
-// requirement.
+// initMetadata returns a Metadata object initialized by shelling out the the
+// `mdata-get` client.
+//
+// TODO: Right now this is mandatory because the rest of the API will require
+// the host UUID.
+func initMetadata() (*Metadata, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 400*time.Millisecond)
+	defer cancel()
+	uuid, err := exec.CommandContext(ctx, "/usr/sbin/mdata-get", "sdc:uuid").Output()
+	if err != nil {
+		return nil, err
+	}
+
+	var (
+		hname string
+		out   bytes.Buffer
+	)
+	ctx2, cancel2 := context.WithTimeout(context.Background(), 400*time.Millisecond)
+	defer cancel2()
+	cmd := exec.CommandContext(ctx2, "/usr/sbin/mdata-get", "sdc:hostname")
+	cmd.Stdout = &out
+	err = cmd.Run()
+	if err == nil {
+		hname = string(out.Bytes())
+	} else {
+		hname = string(uuid)
+	}
+
+	return &Metadata{
+		UUID:     string(uuid),
+		Hostname: string(hname),
+	}, nil
+}
 
 // newTriton constructs a new Triton object with our client as it's provider
 func newTriton(cfg Config) (Triton, error) {
@@ -93,8 +137,21 @@ func newTriton(cfg Config) (Triton, error) {
 		log.Fatalf("NewClient: %s", err)
 	}
 
+	metadata, err := initMetadata()
+	if err != nil {
+		log.Fatalf("initMetadata: %s", err)
+	}
+
+	input := &triton.GetMachineInput{metadata.UUID}
+	localhost, err := client.Machines().GetMachine(context.Background(), input)
+	if err != nil {
+		log.Fatalf("GetMachineInput for localhost: %s", err)
+	}
+
 	return &Triton{
-		Provider: client,
+		Client:   client,
+		Metadata: metadata,
+		Instance: localhost,
 	}, nil
 }
 
