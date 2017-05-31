@@ -57,7 +57,7 @@ func (i Instances) probeNodeAddress(serverName string) (string, error) {
 		return machine.PrimaryIP, nil
 	}
 
-	machine, err := i.probeMachineUUID(serverName)
+	machine, err := i.probeMachineName(serverName)
 	if err != nil {
 		return nil, err
 	}
@@ -182,12 +182,12 @@ func (i Instances) probeMachineBrand(serverName string) (string, error) {
 		return machine.Brand, nil
 	}
 
-	machine, err := i.probeMachineUUID(serverName)
+	machine, err := i.getMachineByName(serverName)
 	if err != nil {
-		return nil, err
+		return "", nil
 	}
 
-	return machine.PrimaryIP, nil
+	return machine.Brand, nil
 }
 
 // InstanceType returns the type of the specified instance.
