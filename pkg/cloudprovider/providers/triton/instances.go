@@ -21,6 +21,10 @@ type Instances struct {
 	provider triton.Client
 }
 
+//
+// -----------------------------------------------------------------------------
+//
+
 // grab UUID of our machine's instance from Joyent's Metadata utility
 // `mdata-get`
 func readMetadataUUID() string {
@@ -36,13 +40,39 @@ func readMetadataUUID() string {
 
 // getMachineByUUID returns the triton.Machine for a given UUID
 func (i Instances) getMachineByUUID(uuid string) triton.Machine {
-	input := triton.GetMachineInput{uuid}
+	input := &triton.GetMachineInput{uuid}
 	machine, err := i.provider.Client.Machines().GetMachine(context.Background(), input)
 	if err != nil {
 		glog.V(2).Errorf("Machines.GetMachine() returned an error: %s", err)
 		return nil, err
 	}
 	return machine, nil
+}
+
+// getMachineByName searches through all machines within a Triton account
+// looking for a match by passed in serverName string. Checks (within order)
+// PrimaryIP, Hostname, and UUID.
+func (i Instances) getMachineByName(serverName string) (triton.Machine, error) {
+	input := &triton.ListMachinesInput{}
+	machines, err := i.Provider.Machines().ListMachines(context.Background(), input)
+	if err != nil {
+		glog.V(2).Errorf("Triton.Instances() returned an error: %s", err)
+		return nil, err
+	}
+
+	for _, machine := range machines {
+		if machine.PrimaryIP == serverName {
+			return machine
+		}
+		if machine.Hostname == serverName {
+			return machine
+		}
+		if machine.ID == serverName {
+			return machine
+		}
+	}
+
+	return nil, fmt.Errorf("No machine found by serverName: %s", serverName)
 }
 
 // probeNodeAddress returns the IP address for the current metadata UUID or a
@@ -57,13 +87,52 @@ func (i Instances) probeNodeAddress(serverName string) (string, error) {
 		return machine.PrimaryIP, nil
 	}
 
-	machine, err := i.probeMachineName(serverName)
+	machine, err := i.getMachineByName(serverName)
 	if err != nil {
 		return nil, err
 	}
 
 	return machine.PrimaryIP, nil
 }
+
+// probeMachineUUID probes the existing machine's metadata for a UUID and
+// returns, otherwise we search through all machines and return an ID that way.
+func (i Instances) probeMachineUUID(serverName string) (string, error) {
+	uuid, err := readMachineUUID()
+	if err == nil {
+		return uuid, nil
+	}
+
+	machine, err := i.getMachineByName(serverName)
+	if err != nil {
+		return "", nil
+	}
+	return machine.ID, nil
+}
+
+// probeNodeAddress returns the IP address for the current metadata UUID or a
+// given serverName.
+func (i Instances) probeMachineBrand(serverName string) (string, error) {
+	uuid, err := readMetadataUUID()
+	if err == nil {
+		machine, err := i.getMachineByUUID(uuid)
+		if err != nil {
+			return "", err
+		}
+		return machine.Brand, nil
+	}
+
+	machine, err := i.getMachineByName(serverName)
+	if err != nil {
+		return "", nil
+	}
+
+	return machine.Brand, nil
+}
+
+//
+// -----------------------------------------------------------------------------
+//
 
 // Instances returns all known cloud providers instances running for our
 // configured Triton client.
@@ -113,47 +182,6 @@ func (i *Instances) NodeAddresses(name types.NodeName) ([]api.NodeAddress, error
 	}, nil
 }
 
-// getMachineByName searches through all machines within a Triton account
-// looking for a match by passed in serverName string. Checks (within order)
-// PrimaryIP, Hostname, and UUID.
-func (i Instances) getMachineByName(serverName string) (triton.Machine, error) {
-	input := &triton.ListMachinesInput{}
-	machines, err := i.Provider.Machines().ListMachines(context.Background(), input)
-	if err != nil {
-		glog.V(2).Errorf("Triton.Instances() returned an error: %s", err)
-		return nil, err
-	}
-
-	for _, machine := range machines {
-		if machine.PrimaryIP == serverName {
-			return machine
-		}
-		if machine.Hostname == serverName {
-			return machine
-		}
-		if machine.ID == serverName {
-			return machine
-		}
-	}
-
-	return nil, fmt.Errorf("No machine found by serverName: %s", serverName)
-}
-
-// probeMachineUUID probes the existing machine's metadata for a UUID and
-// returns, otherwise we search through all machines and return an ID that way.
-func (i Instances) probeMachineUUID(serverName string) (string, error) {
-	id, err := readMachineUUID()
-	if err == nil {
-		return id, nil
-	}
-
-	machine, err := i.getMachineByName(serverName)
-	if err != nil {
-		return "", nil
-	}
-	return machine.ID, nil
-}
-
 // ExternalID returns the cloud provider ID of the node with the specified NodeName.
 //
 // Note: If the instance does not exist or is no longer running, we must return
@@ -168,26 +196,6 @@ func (i *Instances) ExternalID(name types.NodeName) (string, error) {
 func (i *Instances) InstanceID(name types.NodeName) (string, error) {
 	glog.V(2).Infof("Instances.InstanceID() called with %s", name)
 	return i.probeMachineUUID(string(name))
-}
-
-// probeNodeAddress returns the IP address for the current metadata UUID or a
-// given serverName.
-func (i Instances) probeMachineBrand(serverName string) (string, error) {
-	uuid, err := readMetadataUUID()
-	if err == nil {
-		machine, err := i.getMachineByUUID(uuid)
-		if err != nil {
-			return "", err
-		}
-		return machine.Brand, nil
-	}
-
-	machine, err := i.getMachineByName(serverName)
-	if err != nil {
-		return "", nil
-	}
-
-	return machine.Brand, nil
 }
 
 // InstanceType returns the type of the specified instance.
