@@ -99,7 +99,6 @@ func (i Instances) probeNodeAddress(serverName string) (string, error) {
 	if err != nil {
 		return nil, err
 	}
-
 	return machine.PrimaryIP, nil
 }
 
@@ -142,7 +141,6 @@ func (i Instances) probeMachineBrand(serverName string) (string, error) {
 	if err != nil {
 		return "", nil
 	}
-
 	return machine.Brand, nil
 }
 
@@ -226,9 +224,9 @@ func (i *Instances) List(filter string) ([]types.NodeName, error) {
 
 	names := make([]types.NodeName, len(machines))
 	for _, machine := range machines {
-		names = append(names, types.NodeName(machine.Name))
+		names = append(names, types.NodeName(machine.ID))
 	}
-	return names
+	return names, nil
 }
 
 // AddSSHKeyToAllInstances adds an SSH public key as a legal identity for all
@@ -242,5 +240,10 @@ func (i *Instances) AddSSHKeyToAllInstances(user string, keyData []byte) error {
 // most clouds (e.g. GCE) this is the hostname, so we provide the hostname
 func (i *Instances) CurrentNodeName(hostname string) (types.NodeName, error) {
 	glog.V(2).Infof("Instances.CurrentNodeName() called with %s", hostname)
-	return i.getMachineByHostname(hostname)
+	machine, err := i.getMachineByHostname(hostname)
+	if err != nil {
+		glog.V(2).Errorf("Instances.CurrentNodeName() returned an error: %s", err)
+		return nil, err
+	}
+	return types.NodeName(machine.ID), nil
 }
