@@ -14,7 +14,7 @@ import (
 )
 
 type Instances struct {
-	provider Triton
+	provider *Triton
 }
 
 //
@@ -22,11 +22,11 @@ type Instances struct {
 //
 
 // getMachineByUUID returns the triton.Machine for a given UUID
-func (i Instances) getMachineByUUID(uuid string) triton.Machine {
+func (i Instances) getMachineByUUID(uuid string) (*triton.Machine, error) {
 	input := &triton.GetMachineInput{uuid}
 	machine, err := i.provider.Client.Machines().GetMachine(context.Background(), input)
 	if err != nil {
-		glog.V(2).Errorf("Machines.GetMachine() returned an error: %s", err)
+		glog.Errorf("Machines.GetMachine() returned an error: %s", err)
 		return nil, err
 	}
 	return machine, nil
@@ -35,11 +35,11 @@ func (i Instances) getMachineByUUID(uuid string) triton.Machine {
 // getMachineByName searches through all machines within a Triton account
 // looking for a match by passed in serverName string. Checks (within order)
 // PrimaryIP, Hostname, and UUID.
-func (i Instances) getMachineByName(serverName string) (triton.Machine, error) {
+func (i Instances) getMachineByName(serverName string) (*triton.Machine, error) {
 	input := &triton.ListMachinesInput{}
 	machines, err := i.provider.Client.Machines().ListMachines(context.Background(), input)
 	if err != nil {
-		glog.V(2).Errorf("Machines.ListMachines() returned an error: %s", err)
+		glog.Errorf("Machines.ListMachines() returned an error: %s", err)
 		return nil, err
 	}
 
@@ -47,7 +47,7 @@ func (i Instances) getMachineByName(serverName string) (triton.Machine, error) {
 		if machine.PrimaryIP == serverName {
 			return machine, nil
 		}
-		if machine.Hostname == serverName {
+		if machine.Name == serverName {
 			return machine, nil
 		}
 		// TODO: make this a short UUID match
@@ -61,11 +61,11 @@ func (i Instances) getMachineByName(serverName string) (triton.Machine, error) {
 
 // getMachineByHostname searches through all machines within a Triton account
 // looking for a match by passed in hostname string. Checks only hostname.
-func (i Instances) getMachineByHostname(hostname string) (triton.Machine, error) {
+func (i Instances) getMachineByHostname(hostname string) (*triton.Machine, error) {
 	input := &triton.ListMachinesInput{}
 	machines, err := i.provider.Client.Machines().ListMachines(context.Background(), input)
 	if err != nil {
-		glog.V(2).Errorf("Machines.ListMachines() returned an error: %s", err)
+		glog.Errorf("Machines.ListMachines() returned an error: %s", err)
 		return nil, err
 	}
 
@@ -87,17 +87,17 @@ func (i Instances) probeNodeAddress(serverName string) (string, error) {
 	if i.provider.Metadata.Hostname == serverName {
 		machine, err := i.getMachineByUUID(i.provider.Metadata.UUID)
 		if err != nil {
-			return nil, err
+			return "", err
 		}
 		if machine.State != "running" {
-			return nil, cloudprovider.InstanceNotFound
+			return "", cloudprovider.InstanceNotFound
 		}
 		return machine.PrimaryIP, nil
 	}
 
 	machine, err := i.getMachineByName(serverName)
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 	return machine.PrimaryIP, nil
 }
@@ -108,10 +108,10 @@ func (i Instances) probeMachineUUID(serverName string) (string, error) {
 	if i.provider.Metadata.Hostname == serverName {
 		machine, err := i.getMachineByUUID(i.provider.Metadata.UUID)
 		if err != nil {
-			return nil, err
+			return "", err
 		}
 		if machine.State != "running" {
-			return nil, cloudprovider.InstanceNotFound
+			return "", cloudprovider.InstanceNotFound
 		}
 		return machine.ID, nil
 	}
@@ -129,17 +129,17 @@ func (i Instances) probeMachineBrand(serverName string) (string, error) {
 	if i.provider.Metadata.Hostname == serverName {
 		machine, err := i.getMachineByUUID(i.provider.Metadata.UUID)
 		if err != nil {
-			return nil, err
+			return "", err
 		}
 		if machine.State != "running" {
-			return nil, cloudprovider.InstanceNotFound
+			return "", cloudprovider.InstanceNotFound
 		}
 		return machine.Brand, nil
 	}
 
 	machine, err := i.getMachineByName(serverName)
 	if err != nil {
-		return "", nil
+		return "", err
 	}
 	return machine.Brand, nil
 }
@@ -165,9 +165,9 @@ func (t *Triton) Instances() (cloudprovider.Instances, bool) {
 func (i *Instances) NodeAddresses(name types.NodeName) ([]api.NodeAddress, error) {
 	glog.V(2).Infof("Instances.NodeAddresses() called with %s", name)
 
-	ip, err := i.probeNodeAddress(string(serverName))
+	ip, err := i.probeNodeAddress(string(name))
 	if err != nil {
-		glog.V(2).Errorf("Triton.Instances() returned an error: %s", err)
+		glog.Errorf("Triton.Instances() returned an error: %s", err)
 		return nil, err
 	}
 
@@ -218,8 +218,8 @@ func (i *Instances) List(filter string) ([]types.NodeName, error) {
 	input := &triton.ListMachinesInput{}
 	machines, err := i.provider.Client.Machines().ListMachines(context.Background(), input)
 	if err != nil {
-		glog.V(2).Errorf("Triton.Instances() returned an error: %s", err)
-		return nil, false
+		glog.Errorf("Triton.Instances() returned an error: %s", err)
+		return nil, err
 	}
 
 	names := make([]types.NodeName, len(machines))
@@ -242,8 +242,8 @@ func (i *Instances) CurrentNodeName(hostname string) (types.NodeName, error) {
 	glog.V(2).Infof("Instances.CurrentNodeName() called with %s", hostname)
 	machine, err := i.getMachineByHostname(hostname)
 	if err != nil {
-		glog.V(2).Errorf("Instances.CurrentNodeName() returned an error: %s", err)
-		return nil, err
+		glog.Errorf("Instances.CurrentNodeName() returned an error: %s", err)
+		return "", err
 	}
 	return types.NodeName(machine.ID), nil
 }

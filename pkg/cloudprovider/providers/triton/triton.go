@@ -42,7 +42,7 @@ const (
 type Triton struct {
 	Client   *triton.Client
 	Metadata *Metadata
-	Instance triton.Machine
+	Instance *triton.Machine
 }
 
 type Metadata struct {
@@ -119,10 +119,10 @@ func initMetadata() (*Metadata, error) {
 }
 
 // newTriton constructs a new Triton object with our client as it's provider
-func newTriton(cfg Config) (Triton, error) {
+func newTriton(cfg Config) (*Triton, error) {
 	privateKey, err := ioutil.ReadFile(KeyPath)
 	if err != nil {
-		glog.V(2).Error("newTriton() could not access KeyPath")
+		glog.Error("newTriton() could not access KeyPath")
 		return nil, err
 	}
 
@@ -132,7 +132,7 @@ func newTriton(cfg Config) (Triton, error) {
 		log.Fatal(err)
 	}
 
-	client, err := triton.NewClient(cfg.Global.Endpoint, cfg.Global.AccountName, sshKeySigner)
+	client, err := triton.NewClient(cfg.Global.EndpointURL, cfg.Global.AccountName, sshKeySigner)
 	if err != nil {
 		log.Fatalf("NewClient: %s", err)
 	}
@@ -164,4 +164,24 @@ func (t *Triton) ProviderName() string {
 // things with the configuration.
 func (t *Triton) ScrubDNS(nameservers, searches []string) (nsOut, srchOut []string) {
 	return nameservers, searches
+}
+
+// LoadBalancer is just a stub
+func (t *Triton) LoadBalancer() (cloudprovider.LoadBalancer, bool) {
+	return nil, false
+}
+
+// Clusters is just a stub
+func (t *Triton) Clusters() (cloudprovider.Clusters, bool) {
+	return nil, false
+}
+
+// Zones is just a stub
+func (t *Triton) Zones() (cloudprovider.Zones, bool) {
+	return nil, false
+}
+
+// Routes is just a stub
+func (t *Triton) Routes() (cloudprovider.Routes, bool) {
+	return nil, false
 }
