@@ -34,10 +34,7 @@ import (
 	"github.com/joyent/triton-go/authentication"
 )
 
-const (
-	ProviderName = "triton"
-	KeyPath      = "/etc/triton/api_key"
-)
+const ProviderName = "triton"
 
 type Triton struct {
 	Client   *triton.Client
@@ -48,13 +45,12 @@ type Triton struct {
 type Metadata struct {
 	UUID     string
 	Hostname string
-	// ServerUUID string
-	// Datacenter string
 }
 
 type Config struct {
 	Global struct {
 		KeyID       string `gcfg:"key-id"`
+		KeyPath     string `gcfg:"key-path"`
 		EndpointURL string `gcfg:"endpoint-url"`
 		AccountName string `gcfg:"account"`
 	}
@@ -120,9 +116,9 @@ func initMetadata() (*Metadata, error) {
 
 // newTriton constructs a new Triton object with our client as it's provider
 func newTriton(cfg Config) (*Triton, error) {
-	privateKey, err := ioutil.ReadFile(KeyPath)
+	privateKey, err := ioutil.ReadFile(cfg.Global.KeyPath)
 	if err != nil {
-		glog.Error("newTriton() could not access KeyPath")
+		glog.Error("newTriton: could not access configured KeyPath")
 		return nil, err
 	}
 

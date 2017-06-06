@@ -15,6 +15,7 @@ func TestReadConfig(t *testing.T) {
 [Global]
 endpoint-url = https://us-sw-1.api.joyent.com
 key-id = 95:ec:59:3d:73:a8:ae:6b:d0:ec:21:d7:6e:e9:f5:6e
+key-path = /etc/kubernetes/api_key
 account = testuser
 `)
 
