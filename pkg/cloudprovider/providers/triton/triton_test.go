@@ -32,4 +32,7 @@ account = testuser
 	if cfg.Global.AccountName != "testuser" {
 		t.Errorf("Should fail when can't match account: %s", cfg.Global.AccountName)
 	}
+	if cfg.Global.KeyPath != "/etc/kubernetes/api_key" {
+		t.Errorf("Should fail when can't match key-id: %s", cfg.Global.KeyID)
+	}
 }
