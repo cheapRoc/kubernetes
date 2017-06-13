@@ -24,6 +24,7 @@ import (
 	"io/ioutil"
 	"log"
 	"os/exec"
+	"strings"
 	"time"
 
 	"github.com/golang/glog"
@@ -109,8 +110,8 @@ func initMetadata() (*Metadata, error) {
 	}
 
 	return &Metadata{
-		UUID:     string(uuid),
-		Hostname: string(hname),
+		UUID:     strings.TrimSpace(string(uuid)),
+		Hostname: strings.TrimSpace(string(hname)),
 	}, nil
 }
 
