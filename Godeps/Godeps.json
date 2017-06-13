@@ -1510,11 +1510,11 @@
 		},
 		{
 			"ImportPath": "github.com/joyent/triton-go",
-			"Rev": "005f498696506309126a16792f6a0f7fab3a01a5"
+			"Rev": "ac24edbc8b2e6e545cac73c13185b0969de73f0a"
 		},
 		{
 			"ImportPath": "github.com/joyent/triton-go/authentication",
-			"Rev": "005f498696506309126a16792f6a0f7fab3a01a5"
+			"Rev": "ac24edbc8b2e6e545cac73c13185b0969de73f0a"
 		},
 		{
 			"ImportPath": "github.com/jteeuwen/go-bindata",
